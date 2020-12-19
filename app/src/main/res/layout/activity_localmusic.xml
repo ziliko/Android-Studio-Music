@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:background="@drawable/bg2"
+    android:gravity="center">
+    <!-- android:background="@drawable/bg" -->
+
+    <FrameLayout
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content">
+        <com.example.music2.D_bg_SurfaceView
+            android:id="@+id/dbg"
+            android:layout_width="fill_parent"
+            android:layout_height="fill_parent" >
+        </com.example.music2.D_bg_SurfaceView>
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        android:gravity="center"
+        android:orientation="vertical">
+        <TextView
+            android:id="@+id/textView0"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="我的本地音乐播放器"
+            android:textColor="#0A30E6"
+            android:textSize="30sp" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content">
+
+            <TextView
+                android:id="@+id/textView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="歌曲序号："
+                android:textColor="#FC06219E"
+                android:textSize="18sp" />
+
+            <TextView
+                android:id="@+id/text01"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text=""
+                android:textSize="18sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="360dp"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/time_now"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:gravity="right"
+                android:text="0:00"
+                android:textColor="#000000"
+                android:textColorHighlight="#00691A1A"
+                android:textSize="18sp" />
+
+            <SeekBar
+                android:id="@+id/seekBar1"
+                android:layout_width="270dp"
+                android:layout_height="wrap_content"
+                android:max="60000"
+                android:min="0"
+                android:progress="0" />   <!--滑块默认位置-->
+            <TextView
+                android:id="@+id/time_end"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="3:14"
+                android:textColor="#000000"
+                android:textColorHighlight="#00691A1A"
+                android:textSize="18sp" />
+        </LinearLayout>
+
+        <!--开始、结束暂时忽略 -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content">
+
+            <Button
+                android:id="@+id/play"
+                android:layout_width="85dp"
+                android:layout_height="wrap_content"
+                android:text="开始播放" />
+
+            <Button
+                android:id="@+id/pause"
+                android:layout_width="85dp"
+                android:layout_height="wrap_content"
+                android:text="暂停|继续" />
+
+            <Button
+                android:id="@+id/next"
+                android:layout_width="85dp"
+                android:layout_height="wrap_content"
+                android:text="下一首" />
+
+            <Button
+                android:id="@+id/like"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:text="♥"
+                android:textColor="#FF0000"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/Xlike"
+                android:layout_width="45dp"
+                android:layout_height="wrap_content"
+                android:text="💔"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content">
+            <Button
+                android:id="@+id/all_like_recently"
+                android:layout_width="85dp"
+                android:layout_height="wrap_content"
+                android:text="列表:全部" />
+            <Button
+                android:id="@+id/play_mode"
+                android:layout_width="85dp"
+                android:layout_height="wrap_content"
+                android:text="模式:顺序" />
+            <Button
+                android:id="@+id/scan"
+                android:layout_width="85dp"
+                android:layout_height="wrap_content"
+                android:text="扫描本地" />
+            <Button
+                android:id="@+id/exit"
+                android:layout_width="85dp"
+                android:layout_height="wrap_content"
+                android:text="保存退出" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/textView1"
+            android:layout_width="wrap_content"
+            android:layout_height="60dp"
+            android:gravity="center"
+            android:text="点击列表内容即可播放"
+            android:textColor="#800A30E6"
+            android:textSize="15sp" />
+
+        <ListView
+            android:id="@+id/mylist"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+        </ListView>
+    </LinearLayout>
+
+
+
+</RelativeLayout>

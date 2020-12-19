@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- TODO 关于Option-Memu 参考
+    https://blog.csdn.net/qq_42889476/article/details/89036479
+    -->
+    <item
+        android:title="test"
+        android:id="@+id/test">
+    </item>
+
+    <item
+        android:title="背景动画开/关"
+        android:id="@+id/view_switch">
+    </item>
+
+    <item
+        android:title="second"
+        android:id="@+id/second">
+        <menu>
+            <item
+                android:title="second_1"
+                android:id="@+id/second_1"/>
+        </menu>
+    </item>
+
+    <item
+        android:title="third"
+        android:id="@+id/third">
+        <menu>
+            <item
+                android:title="third_1"
+                android:id="@+id/third_1"/>
+            <item
+                android:title="third_2"
+                android:id="@+id/third_2"/>
+            <item
+                android:title="third_3"
+                android:id="@+id/third_3"/>
+        </menu>
+    </item>
+
+    <item
+        android:title="退出并保存"
+        android:id="@+id/exit">
+    </item>
+
+</menu>
