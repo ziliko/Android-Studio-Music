@@ -5,8 +5,12 @@ import androidx.appcompat.app.AppCompatActivity;
         import androidx.core.content.ContextCompat;
 
         import android.Manifest;
-        import android.content.Context;
+import android.content.BroadcastReceiver;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.ServiceConnection;
 import android.content.SharedPreferences;
         import android.content.pm.PackageManager;
 import android.database.Cursor;
@@ -16,6 +20,7 @@ import android.net.Uri;
 import android.os.Build;
         import android.os.Bundle;
         import android.os.Environment;
+import android.os.IBinder;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -43,36 +48,51 @@ import java.util.HashMap;
         import java.util.TimerTask;
 
 //implements 监听类，可以更简洁导用不同按键控件？ 需实现onClick(View v)
-public class Localmusic extends AppCompatActivity implements View.OnClickListener,HeadsetButtonReceiver.onHeadsetListener {
+public class Localmusic extends AppCompatActivity implements View.OnClickListener {
     //
     private static final String TAG = "Localmusic";
-    HeadsetButtonReceiver headsetButtonReceiver;
+    //HeadsetButtonReceiver headsetButtonReceiver;
     private Music_Datebase helper;
     private SQLiteDatabase mydb;
-    private Timer timer;//定时器
+    private Music_Service music_service;//绑定的service的对象
+    LocationReceiver locationReceiver;//本地广播接收器
+    //private Timer timer;//定时器
     ListView mylist;
     List<Song> list;
-    TextView tv1,tv2,time_now,time_end;
-    SeekBar seekBar;
+    static TextView tv1,tv2,time_now,time_end;
+    static SeekBar seekBar;
     Button play,pause,next,like,Xlike,
             all_like_recently,play_mode,scan,exit;
-    String testpath;//记录地址 用于添加喜爱时作为关键字表示
-    boolean isSeekbarChaning;
+    static String testpath;//记录地址 用于添加喜爱时作为关键字表示
+    static boolean isSeekbarChaning;
     int number;
     int mode;//0 1 2
     String modes[]={"模式:顺序","模式:循环","模式:随机"};
     int list_kind;//0 1 2
     String list_kinds[]={"列表:全部","列表:喜爱","列表:历史"};
 
-    int delay1;//用于控制切歌间隔，防止点击过快出错
+    static int delay1;//用于控制切歌间隔，防止点击过快出错
 
     //备注：Sharepreference保存了number和mode值 + 进度条?
     private SharedPreferences sp;//
-    private MediaPlayer player=new MediaPlayer();
+    //private MediaPlayer player=new MediaPlayer();
     private D_bg_SurfaceView Dbg=null;
 
-    /**************************************************分割线*********************************************/
-    //初始化部分
+    /**************************************************分割线：初始化部分*********************************************/
+
+    //连接Activity和Service
+    private ServiceConnection connection=new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            music_service=((Music_Service.MyBinder)service).getService();//返回一个Music_Service对象
+            init_ServiceValue();
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -82,13 +102,19 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
         setContentView(R.layout.activity_localmusic);
         Dbg=(D_bg_SurfaceView)findViewById(R.id.dbg);
 
-        //新建耳机线控广播接收器的实例对象
+        /*注册本地广播接收器*/
+        locationReceiver=new LocationReceiver();
+        IntentFilter filter=new IntentFilter();
+        filter.addAction("location.action");
+        registerReceiver(locationReceiver,filter);
+
+        /*新建耳机线控广播接收器的实例对象
         headsetButtonReceiver=new HeadsetButtonReceiver(this);
         headsetButtonReceiver.setOnHeadsetListener(this);
-
+        */
         this.initDB();
         this.initValue();
-        this.initplayerListener();
+        //this.initplayerListener();
         this.initSeekBarListener();
 
         mylist = (ListView) findViewById(R.id.mylist);
@@ -105,14 +131,20 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
         }
         MyAdapter myAdapter = new MyAdapter(Localmusic.this, list);
         mylist.setAdapter(myAdapter);
-        //
+
+        //绑定service
+        Intent bingIntent=new Intent(Localmusic.this,Music_Service.class);
+        bindService(bingIntent,connection,BIND_AUTO_CREATE);
+        Log.d(TAG, "onCreate: 绑定Music_Service");
+
         //给ListView添加点击事件，实现点击哪首音乐就进行播放
         mylist.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
                 number=i;
+                music_service.number=number;
                 String p = list.get(i).path;//获得歌曲的地址
-                play(p);
+                music_service.play(p);
             }
         });
 
@@ -121,7 +153,8 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
 
     @Override
     protected void onDestroy(){
-        super.onDestroy();
+        unbindService(connection);//取消绑定service
+        unregisterReceiver(locationReceiver);//卸载广播接收器
         //记录数值到SharePreferences
         SharedPreferences.Editor editor=sp.edit();
         editor.putInt("number",number);
@@ -129,15 +162,16 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
         editor.putInt("list_kind",list_kind);
         editor.commit();
         //
-        headsetButtonReceiver.unregisterHeadsetReceiver();//注销耳机线控广播
+        //headsetButtonReceiver.unregisterHeadsetReceiver();//注销耳机线控广播
 
-        //内存释放
+        /*内存释放
         if(timer!=null) timer.cancel();
         if(player!=null){
             player.stop();
             player.release();
-        }
+        }*/
         Log.d(TAG,"本地音乐界面Destroy");
+        super.onDestroy();
     }
 
     //创建OptionMenu菜单
@@ -148,11 +182,52 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
         getMenuInflater ().inflate (R.menu.memu1,menu);  //第一个传入的参数是你创建的menu的名字
         return true;  //一定要return true 才会显示出来
     }
+    /**********************************************************************分割线：播放音乐更新UI*****************************************************************/
+    //Activity更新UI  信号通过定时器检测来刷新？
+    public void play_UI_update(String path){
+        number=music_service.number;
+        Dbg.item_change();//切换背景布效果
+        tv1.setText(String.valueOf(number+1));//TODO刷新显示
+        //列表滚动到指定位置
+        //mylist.setSelection(number);//瞬间跳到指定位置  方法1:listview.setSelection(position);跳到指定位置并置顶
+        mylist.smoothScrollToPosition(number);// 方法2:listview.smoothScrollToPosition(position);自动滚动,当指定位置出现即停止 加入第二个参数指定距top的距离?  距离过大时会中途停止?   TODO 若要改变速度，需要查看源码并重新自定义一个方法
 
-    /**************************************************分割线*********************************************/
-    //监听器
+        //更新最近播放 数据库表   先删除(若已有)，再插入最后，最后删除超过20条以上时的前几条记录
+        String sql1="DELETE FROM " + helper.TABLE_NAME3 + " WHERE path='"+ path +"' ";
+        String sql2="INSERT into " + helper.TABLE_NAME3 + "(path,favourite, song, singer,time) select path,favourite, song, singer,time from " + helper.TABLE_NAME+" WHERE path='"+ path +"'";//uid不能复制
+        mydb.execSQL(sql1);
+        mydb.execSQL(sql2);
+        //刷新显示 （仅当显示历史表的情况下）
+        if(list_kind==2){
+            list = new ArrayList<>();
+            list=getDatebase();
+            if(list==null){
+                Song empty=new Song();
+                empty.init_Song("没有数据");
+                list = new ArrayList<>();
+                list.add(empty);
+            }
+            Localmusic.MyAdapter myAdapter = new Localmusic.MyAdapter(Localmusic.this, list);
+            mylist.setAdapter(myAdapter);
+            tv1.setText("1");//历史表总是播放序号1 的歌曲
+        }
+    }
+    //Activity删除无效数据库数据  信号通过定时器检测来刷新？
+    public void play_error_delete(String path){
+        //路径无效的情况下 删除数据库中该数据
+        if(path.equals("")||path.equals("没有数据")){
+            Toast.makeText(this, "无可播放", Toast.LENGTH_SHORT).show();
+        }
+        else {
+            String sql ="DELETE FROM " + helper.TABLE_NAME + " WHERE path='"+ path +"' ";  //TODO:  VALUES (xx,xx) 插入所有列数据 需保证格式
+            mydb.execSQL(sql);
+            Toast.makeText(this, "无效路径已删除,重启或者换列表后刷新", Toast.LENGTH_SHORT).show();
+            //play_next();//危！可能死循环
+        }
+    }
+    /**********************************************************************分割线：监听器*****************************************************************/
 
-    //监听播放器播放完成 自动切换下一首
+    /*监听播放器播放完成 自动切换下一首
     private void initplayerListener(){
         player.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
             @Override
@@ -160,7 +235,7 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
                 play_next();
             }
         });
-    }
+    }*/
 
     //进度条监听器
     private void initSeekBarListener(){
@@ -183,7 +258,7 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
                 //放开SeekBar时触发
                 //跳到此处播放
                 isSeekbarChaning=false;
-                player.seekTo(seekBar.getProgress());
+                music_service.player.seekTo(seekBar.getProgress());
             }
         });
     }
@@ -193,19 +268,19 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
     public void onClick(View v) {
         switch (v.getId()) {
             case R.id.play:
-                if (!player.isPlaying()) {
+                if (!music_service.player.isPlaying()) {
                     String p = list.get(number).path;//获得歌曲的地址
-                    play(p);
+                    music_service.play(p);
                 }
                 break;
             case R.id.pause://暂停/继续
-                if (player.isPlaying()) player.pause();
-                else player.start();
+                if (music_service.player.isPlaying()) music_service.player.pause();
+                else music_service.player.start();
                 break;
             case R.id.next://下一首
                 if(delay1>10){//防止按的太快出错？
                     delay1=0;
-                    play_next();
+                    music_service.play_next();
                 }
                 break;
             case R.id.like://添加喜爱
@@ -230,6 +305,7 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
                     list = new ArrayList<>();
                     list.add(empty);
                 }
+                music_service.list=list;//TODO 注：服务里不用list_kind值，相对的每次改变列表都要刷新list
                 MyAdapter myAdapter = new MyAdapter(Localmusic.this, list);
                 mylist.setAdapter(myAdapter);
 
@@ -241,6 +317,7 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
                     initMediaPlayer();
                 }*/
                 mode++;if(mode>2) mode=0;//0 1 2
+                music_service.mode=mode;
                 play_mode.setText(modes[mode]);
                 break;
             case R.id.scan://扫描本地 并更新数据库(耗时吗?)
@@ -315,9 +392,8 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
         return super.onOptionsItemSelected (item);
     }
 
-    /**************************************************分割线*********************************************/
-    //函数
-
+    /**************************************************分割线：函数*********************************************/
+    //数据库初始化
     private void initDB() {
         helper = new Music_Datebase(Localmusic.this);
         mydb = helper.getWritableDatabase();
@@ -361,7 +437,14 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
         all_like_recently.setText(list_kinds[list_kind]);
     }
 
-    //暂时不用...... 预加载，防闪退（仅限于zi个人的手机）
+    //服务变量初始化
+    private void init_ServiceValue(){
+        music_service.number=number;
+        music_service.list=list;
+        music_service.mode=mode;
+        music_service.list_kind=list_kind;//注：这个Service用不到，但是每次改变都要刷新服务的list
+    }
+    /*暂时不用...... 预加载，防闪退（仅限于zi个人的手机）
     private void initMediaPlayer(){
         try {
             //获取手机本身存储根目录Environment.getExternalStoragePublicDirectory("")
@@ -381,7 +464,7 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
         }catch (Exception e){
             e.printStackTrace();
         }
-    }
+    }*/
 
     //权限申请函数
     @Override
@@ -389,7 +472,7 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
         switch (requestCode){
             case 1:
                 if(grantResults.length>0 && grantResults[0]==PackageManager.PERMISSION_GRANTED){
-                    initMediaPlayer();
+                    //initMediaPlayer();
                 }
                 else{
                     Toast.makeText(this,"拒绝权限将无法使用程序",Toast.LENGTH_SHORT).show();
@@ -400,85 +483,7 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
         }
     }
 
-    //播放音乐函数
-    public void play(String path) {
-        if(path==null) path="";
-        tv2.setText("路径:"+path);//显示路径
-        final String thispath=path;
-        try {
-            testpath=path;//记录一下地址供引用
-            // 重置音频文件，防止多次点击会报错
-            player.reset();
-            // 调用方法传进播放地址
-            player.setDataSource(path);
-            // 异步准备资源，防止卡顿
-            player.prepareAsync();
-            // 调用音频的监听方法，音频准备完毕后响应该方法进行音乐播放
-            player.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
-                @Override
-                public void onPrepared(MediaPlayer mediaPlayer) {
-                    mediaPlayer.start();
-                    //2020/9/1添加 start ps:getDuration必须准备好才能获取，否则是-1
-                    final int duration = player.getDuration();//获取音乐总时间
 
-                    seekBar.setMax(duration);//将音乐总时间设置为Seekbar的最大值
-                    time_now.setText("0:00");
-                    time_end.setText(""+getTime(duration/1000));
-                    //if(timer!=null) {timer.cancel();timer=null;}
-                    timer = new Timer();
-                    timer.schedule(new TimerTask() {
-                        @Override
-                        public void run() {
-                            if(!isSeekbarChaning&&player.isPlaying()){
-                                int x=player.getCurrentPosition();
-                                seekBar.setProgress(x);//获取当前播放到哪的时间点
-                            }
-                            delay1+=4;
-                            if(delay1>1000) delay1=11;
-                        }
-                    },0,200);
-                    //2020/9/1添加 end
-                }
-            });
-            tv1.setText(String.valueOf(number+1));//TODO刷新显示
-            //列表滚动到指定位置
-            //mylist.setSelection(number);//瞬间跳到指定位置  方法1:listview.setSelection(position);跳到指定位置并置顶
-            mylist.smoothScrollToPosition(number);// 方法2:listview.smoothScrollToPosition(position);自动滚动,当指定位置出现即停止 加入第二个参数指定距top的距离?  距离过大时会中途停止?   TODO 若要改变速度，需要查看源码并重新自定义一个方法
-
-            //更新最近播放 数据库表   先删除(若已有)，再插入最后，最后删除超过20条以上时的前几条记录
-            String sql1="DELETE FROM " + helper.TABLE_NAME3 + " WHERE path='"+ path +"' ";
-            String sql2="INSERT into " + helper.TABLE_NAME3 + "(path,favourite, song, singer,time) select path,favourite, song, singer,time from " + helper.TABLE_NAME+" WHERE path='"+ path +"'";//uid不能复制
-            mydb.execSQL(sql1);
-            mydb.execSQL(sql2);
-            //刷新显示 （仅当显示历史表的情况下）
-            if(list_kind==2){
-                list = new ArrayList<>();
-                list=getDatebase();
-                if(list==null){
-                    Song empty=new Song();
-                    empty.init_Song("没有数据");
-                    list = new ArrayList<>();
-                    list.add(empty);
-                }
-                MyAdapter myAdapter = new MyAdapter(Localmusic.this, list);
-                mylist.setAdapter(myAdapter);
-                tv1.setText("1");//历史表总是播放序号1 的歌曲
-            }
-
-        } catch (IOException e) {
-            e.printStackTrace();
-            //路径无效的情况下 删除数据库中该数据
-            if(path.equals("")||path.equals("没有数据")){
-                Toast.makeText(this, "无可播放", Toast.LENGTH_SHORT).show();
-            }
-            else {
-                String sql ="DELETE FROM " + helper.TABLE_NAME + " WHERE path='"+ thispath +"' ";  //TODO:  VALUES (xx,xx) 插入所有列数据 需保证格式
-                mydb.execSQL(sql);
-                Toast.makeText(this, "无效路径已删除,重启或者换列表后刷新", Toast.LENGTH_SHORT).show();
-                play_next();//危！可能死循环
-            }
-        }
-    }
 
     //时间转换函数 用于显示
     public String getTime(int time){
@@ -488,7 +493,7 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
         return min+":"+sec;
     }
 
-    //播放下一首函数
+    /*播放下一首函数
     public void play_next(){
         if(mode==0) {number++;if(number>=list.size()) number=0;}//顺序
         else if(mode==1){if(number>=list.size()) number=0;}//单曲循环
@@ -498,7 +503,7 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
 
         String p = list.get(number).path;//获得歌曲的地址
         play(p);
-    }
+    }*/
 
     //扫描获取数据库里的歌曲信息 返回List
     public List<Song> getDatebase(){
@@ -579,9 +584,22 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
 
     }
     ;
-    /**************************************************分割线*********************************************/
-    //其他
+    /**************************************************分割线：其他*********************************************/
 
+    // TODO 创建内部类做为广播接收器接收服务发来的消息并立即处理 注：需要在onCreate里注册
+    public class LocationReceiver extends BroadcastReceiver{
+        @Override
+        public void onReceive(Context context,Intent intent){
+            String intentAction=intent.getAction();
+            if(intentAction.equals("location.action")) {
+                Bundle bundle=intent.getExtras();
+                String action=bundle.getString("action");
+                String path=bundle.getString("msg");
+                if(action.equals("update")) play_UI_update(path);
+                else if(action.equals("delete")) play_error_delete(path);
+            }
+        }
+    }
     // TODO  写一个适配器把内容映射到ListView中
     class MyAdapter extends BaseAdapter {
 
@@ -651,7 +669,7 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
 
     }
 
-    //TODO 实现线控广播接口的抽象方法
+    /*TODO 实现线控广播接口的抽象方法
     //单击：播放/暂停
     public void playOrPause(){
         Toast.makeText(this,"单击，暂停/继续",Toast.LENGTH_SHORT).show();
@@ -669,5 +687,6 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
         else D_bg_SurfaceView.view_switch=true;
         Toast.makeText(this,"三击，背景动画开/关",Toast.LENGTH_SHORT).show();
     }
+    */
 
 }
