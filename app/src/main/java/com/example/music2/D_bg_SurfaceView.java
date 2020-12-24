@@ -28,18 +28,18 @@ import java.util.TimerTask;
 public class D_bg_SurfaceView extends SurfaceView implements SurfaceHolder.Callback, Runnable{//父类只能一个,接口可以多个
 
     public static boolean view_switch=false;//控制动画开关
+    public static boolean stop=false;//控制物品创造的开关
     //TODO 当前问题(性能优化)：该布尔变量只是阻止了新下坠物的诞生，计数等功能依然在继续，定时器耗电吗?  以及开关控制只能耳机线，需另加按钮
 
     private static final String TAG = "D_bg_SurfaceView";
     private static D_bg_SurfaceView Stage1;
 
     private static int bggundong=0;//控制背景滚动
-    public static int stop;//控制暂停
 
     public static int items;//控制场景种类切换 雨/雪/花/叶
     int section=0;//控制场景阶段 稀疏/中雨/暴雪等
 
-    public static boolean flag;//或者用flag控制暂停？
+    boolean flag;//或者用flag控制暂停？
     Thread th;//单独刷屏线程
     SurfaceHolder sfh;
     Canvas canvas;
@@ -78,15 +78,16 @@ public class D_bg_SurfaceView extends SurfaceView implements SurfaceHolder.Callb
         sfh.addCallback(this);  // 绑定Callback监听器
         paint = new Paint();
 
+        this.initValue();//所有变量的初始化
+        this.initTimerTask();
+
         bg = BitmapFactory.decodeResource(getResources(), R.drawable.bg);
         item_kind1= BitmapFactory.decodeResource(getResources(), R.drawable.snow_l);
         item_kind2 = BitmapFactory.decodeResource(getResources(), R.drawable.rain_l);
         //item_kind3 = BitmapFactory.decodeResource(getResources(), R.drawable.boss_bullet3);
 
         //setFocusable(true);//控制键盘是否可以获得这个按钮的焦点?
-        this.initValue();//所有变量的初始化
 
-        this.initTimerTask();
         Log.d(TAG,"自定义动画对象构建");
     }
 
@@ -121,7 +122,7 @@ public class D_bg_SurfaceView extends SurfaceView implements SurfaceHolder.Callb
         task = new TimerTask() {
             @Override
             public void run() {
-                if(flag){
+                if(flag&&!stop){
                     //已有Item移动
                     for(int i=0;i<item_List.size();i++)
                     {
@@ -181,12 +182,15 @@ public class D_bg_SurfaceView extends SurfaceView implements SurfaceHolder.Callb
                                             item_List.add(new D_bg_item((int)(-screenWidth+screenWidth*3*Math.random()),(int)(-300*Math.random()),screenWidth,screenHeight,20,item_kind2,0,90+15*rain_control));//变子弹只需要改这里  速度(int)(10+4*Math.random())
                                             break;
                                         case 1:
-                                            int x=(int)(screenWidth/10*Math.random());
-                                            for(int i=0;i<20;i++) item_List.add(new D_bg_item((int)(-screenWidth+screenWidth*3*i/20+x),(int)(-300*Math.random()),screenWidth,screenHeight,30,item_kind2,0,90+15*rain_control));//变子弹只需要改这里
-                                            break;
+                                            int x=(int)(screenWidth/10*(Math.random()-0.5));
+                                            for(int i=0;i<40;i++) {
+                                                if(Math.random()<0.5) item_List.add(new D_bg_item((int)(-screenWidth+screenWidth*3*i/20+x),(int)(-300*Math.random()),screenWidth,screenHeight,30,item_kind2,0,90+15*rain_control));//变子弹只需要改这里
+                                            }break;
                                         case 2:
-                                            int y=(int)(screenWidth/20*Math.random());
-                                            for(int i=0;i<50;i++) item_List.add(new D_bg_item((int)(-screenWidth+screenWidth*3*i/50+y),(int)(-300*Math.random()),screenWidth,screenHeight,40,item_kind2,0,90+15*rain_control));//变子弹只需要改这里
+                                            int y=(int)(screenWidth/20*(Math.random()-0.5));
+                                            for(int i=0;i<100;i++) {
+                                                if(Math.random()<0.5) item_List.add(new D_bg_item((int)(-screenWidth+screenWidth*3*i/50+y),(int)(-300*Math.random()),screenWidth,screenHeight,40,item_kind2,0,90+15*rain_control));//变子弹只需要改这里
+                                            }
                                             break;
                                         default:break;
                                     }
@@ -213,9 +217,22 @@ public class D_bg_SurfaceView extends SurfaceView implements SurfaceHolder.Callb
     //用于刷新画布
     public void run() {
         while (flag) {
-            //if(stop==0){
+            if(stop){//stop状态下每1秒刷新一次，用于切屏后刷新背景
                 long start = System.currentTimeMillis();
-                if(!view_switch&&item_List.size()==0) flag=false;
+                myDraw();
+                long end = System.currentTimeMillis();
+                long interval = end - start;
+                try {
+                    if (interval < 1000) {
+                        Thread.sleep(1000 - interval);
+                    }
+                } catch (InterruptedException ex) {
+                    ex.printStackTrace();
+                }
+            }
+            else if(!stop){
+                long start = System.currentTimeMillis();
+                if(!view_switch&&item_List.size()==0) stop=true;
                 myDraw();
                 long end = System.currentTimeMillis();
                 long interval = end - start;
@@ -226,7 +243,7 @@ public class D_bg_SurfaceView extends SurfaceView implements SurfaceHolder.Callb
                 } catch (InterruptedException ex) {
                     ex.printStackTrace();
                 }
-            //}
+            }
         }
     }
 
@@ -257,7 +274,6 @@ public class D_bg_SurfaceView extends SurfaceView implements SurfaceHolder.Callb
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
         flag = false;
-        stop=1;
         Log.d(TAG,"自定义动画界面销毁");
         //timer.cancel();
         //mediaplayer.pause();//用于切屏回来后继续播放音乐

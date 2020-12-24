@@ -54,7 +54,7 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
     //HeadsetButtonReceiver headsetButtonReceiver;
     private Music_Datebase helper;
     private SQLiteDatabase mydb;
-    private Music_Service music_service;//绑定的service的对象
+    //private Music_Service music_service;//绑定的service的对象
     LocationReceiver locationReceiver;//本地广播接收器
     //private Timer timer;//定时器
     ListView mylist;
@@ -65,7 +65,7 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
             all_like_recently,play_mode,scan,exit;
     static String testpath;//记录地址 用于添加喜爱时作为关键字表示
     static boolean isSeekbarChaning;
-    int number;
+    static int number;
     int mode;//0 1 2
     String modes[]={"模式:顺序","模式:循环","模式:随机"};
     int list_kind;//0 1 2
@@ -80,7 +80,7 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
 
     /**************************************************分割线：初始化部分*********************************************/
 
-    //连接Activity和Service
+    /*连接Activity和Service
     private ServiceConnection connection=new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
@@ -93,6 +93,7 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
 
         }
     };
+     */
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -132,19 +133,31 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
         MyAdapter myAdapter = new MyAdapter(Localmusic.this, list);
         mylist.setAdapter(myAdapter);
 
-        //绑定service
+        /*start方式启动service*/
+        Intent startIntent=new Intent(Localmusic.this,Music_Service.class);
+        startService(startIntent);
+        init_ServiceValue();
+        /*bind方式绑定启动service
         Intent bingIntent=new Intent(Localmusic.this,Music_Service.class);
         bindService(bingIntent,connection,BIND_AUTO_CREATE);
         Log.d(TAG, "onCreate: 绑定Music_Service");
+         */
 
         //给ListView添加点击事件，实现点击哪首音乐就进行播放
         mylist.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
                 number=i;
-                music_service.number=number;
+                Music_Service.number=number;
                 String p = list.get(i).path;//获得歌曲的地址
-                music_service.play(p);
+
+                //发送广播给服务，接下来播放该曲目
+                Intent intent = new Intent();
+                intent.putExtra("action", "play");
+                intent.putExtra("msg", p);
+                intent.setAction("location.action");//intent.setAction("location.reportsucc");
+                sendBroadcast(intent);
+                //Music_Service.play(p);
             }
         });
 
@@ -153,7 +166,7 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
 
     @Override
     protected void onDestroy(){
-        unbindService(connection);//取消绑定service
+        //unbindService(connection);//取消绑定service
         unregisterReceiver(locationReceiver);//卸载广播接收器
         //记录数值到SharePreferences
         SharedPreferences.Editor editor=sp.edit();
@@ -185,9 +198,7 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
     /**********************************************************************分割线：播放音乐更新UI*****************************************************************/
     //Activity更新UI  信号通过定时器检测来刷新？
     public void play_UI_update(String path){
-        number=music_service.number;
         Dbg.item_change();//切换背景布效果
-        tv1.setText(String.valueOf(number+1));//TODO刷新显示
         //列表滚动到指定位置
         //mylist.setSelection(number);//瞬间跳到指定位置  方法1:listview.setSelection(position);跳到指定位置并置顶
         mylist.smoothScrollToPosition(number);// 方法2:listview.smoothScrollToPosition(position);自动滚动,当指定位置出现即停止 加入第二个参数指定距top的距离?  距离过大时会中途停止?   TODO 若要改变速度，需要查看源码并重新自定义一个方法
@@ -258,7 +269,7 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
                 //放开SeekBar时触发
                 //跳到此处播放
                 isSeekbarChaning=false;
-                music_service.player.seekTo(seekBar.getProgress());
+                Music_Service.player.seekTo(seekBar.getProgress());
             }
         });
     }
@@ -268,19 +279,31 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
     public void onClick(View v) {
         switch (v.getId()) {
             case R.id.play:
-                if (!music_service.player.isPlaying()) {
+                if (!Music_Service.player.isPlaying()) {
                     String p = list.get(number).path;//获得歌曲的地址
-                    music_service.play(p);
+                    //Music_Service.play(p);
+                    //发送广播给服务，接下来播放该曲目
+                    Intent intent = new Intent();
+                    intent.putExtra("action", "play");
+                    intent.putExtra("msg", p);
+                    intent.setAction("location.action");//intent.setAction("location.reportsucc");
+                    sendBroadcast(intent);
                 }
                 break;
             case R.id.pause://暂停/继续
-                if (music_service.player.isPlaying()) music_service.player.pause();
-                else music_service.player.start();
+                if (Music_Service.player.isPlaying()) Music_Service.player.pause();
+                else Music_Service.player.start();
                 break;
             case R.id.next://下一首
                 if(delay1>10){//防止按的太快出错？
                     delay1=0;
-                    music_service.play_next();
+                    //Music_Service.play_next();
+                    //发送广播给服务，接下来播放该曲目
+                    Intent intent = new Intent();
+                    intent.putExtra("action", "next");
+                    intent.putExtra("msg", "无");
+                    intent.setAction("location.action");//intent.setAction("location.reportsucc");
+                    sendBroadcast(intent);
                 }
                 break;
             case R.id.like://添加喜爱
@@ -305,7 +328,7 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
                     list = new ArrayList<>();
                     list.add(empty);
                 }
-                music_service.list=list;//TODO 注：服务里不用list_kind值，相对的每次改变列表都要刷新list
+                Music_Service.list=list;//TODO 注：服务里不用list_kind值，相对的每次改变列表都要刷新list
                 MyAdapter myAdapter = new MyAdapter(Localmusic.this, list);
                 mylist.setAdapter(myAdapter);
 
@@ -317,7 +340,7 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
                     initMediaPlayer();
                 }*/
                 mode++;if(mode>2) mode=0;//0 1 2
-                music_service.mode=mode;
+                Music_Service.mode=mode;
                 play_mode.setText(modes[mode]);
                 break;
             case R.id.scan://扫描本地 并更新数据库(耗时吗?)
@@ -364,7 +387,7 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
                 }
                 else {
                     D_bg_SurfaceView.view_switch=true;
-                    D_bg_SurfaceView.flag=true;
+                    D_bg_SurfaceView.stop=false;
                     Toast.makeText (this,"背景动画开启",Toast.LENGTH_SHORT).show ();
                 }
                 break;
@@ -439,10 +462,10 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
 
     //服务变量初始化
     private void init_ServiceValue(){
-        music_service.number=number;
-        music_service.list=list;
-        music_service.mode=mode;
-        music_service.list_kind=list_kind;//注：这个Service用不到，但是每次改变都要刷新服务的list
+        Music_Service.number=number;
+        Music_Service.list=list;
+        Music_Service.mode=mode;
+        Music_Service.list_kind=list_kind;//注：这个Service用不到，但是每次改变都要刷新服务的list
     }
     /*暂时不用...... 预加载，防闪退（仅限于zi个人的手机）
     private void initMediaPlayer(){
@@ -597,6 +620,7 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
                 String path=bundle.getString("msg");
                 if(action.equals("update")) play_UI_update(path);
                 else if(action.equals("delete")) play_error_delete(path);
+                Log.i(TAG, "onReceive: 广播"+action);
             }
         }
     }

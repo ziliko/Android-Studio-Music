@@ -2,6 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.music2">
 
+    <!--注释内容：Service启动时创建通知的权限 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <!--注释内容：访问本地多媒体文件的权限 -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
 

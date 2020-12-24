@@ -56,8 +56,8 @@ public class Utils {
                 //显示的文件名  DISPLAY_NAME
                 //类型  .MIME_TYPE
 
-                //把歌曲名字和歌手切割开 并规定大于一定时长的歌曲才导入
-                if (song.size > 1000 * 800) {
+                //把歌曲名字和歌手切割开 并规定大于一定时长(0.8MB 和 60秒)的歌曲才导入
+                if (song.size > 1000 * 800&&song.duration>60000) {//0.8MB ??
                     /* 该切割方式不稳定
                     if (song.song.contains("-")) {
                         String[] str = song.song.split("-");

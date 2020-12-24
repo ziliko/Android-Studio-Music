@@ -5,12 +5,16 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.media.MediaPlayer;
 import android.os.Binder;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.IBinder;
 import android.util.Log;
 import android.widget.Toast;
@@ -27,13 +31,14 @@ public class Music_Service extends Service implements HeadsetButtonReceiver.onHe
     private static final String TAG = "Music_Service";
     private String notificationId = "serviceid";
     private String notificationName = "servicename";
+    LocationReceiver locationReceiver;//本地广播接收器
 
     HeadsetButtonReceiver headsetButtonReceiver;
-    List<Song> list;//持有一个播放列表，copy Activity里的，保证内循环
-    MediaPlayer player=new MediaPlayer();
-    int number;
-    int mode;//0 1 2
-    int list_kind;//0 1 2
+    static List<Song> list;//持有一个播放列表，copy Activity里的，保证内循环
+    static MediaPlayer player=new MediaPlayer();
+    static int number;
+    static int mode;//0 1 2
+    static int list_kind;//0 1 2
     private Timer timer;
 
     public Music_Service() {
@@ -45,18 +50,52 @@ public class Music_Service extends Service implements HeadsetButtonReceiver.onHe
     @Override
     public void onCreate() {
         Log.d(TAG, "onCreate: ");
+
+        /*注册本地广播接收器*/
+        locationReceiver=new LocationReceiver();
+        IntentFilter filter=new IntentFilter();
+        filter.addAction("location.action");
+        registerReceiver(locationReceiver,filter);
+
         /*创建一个前台服务 TODO 是否会有版本不兼容的问题？待确认*/
-        //Intent intent=new Intent(this,MainActivity.class);
-        //PendingIntent pi=PendingIntent.getActivities(this,0,intent,0);
-        Notification notification=new NotificationCompat.Builder(this)
-                .setContentTitle("my音乐播放器")         //用于指定通知的标题内容
-                .setContentText("music2")                 //用于指定通知的正文内容
-                //.setWhen(System.currentTimeMillis())    //用于指定通知被创建的时间 单位毫秒
-                .setSmallIcon(R.drawable.myback)           //用于指定通知的小图标,注意只能用纯alpha图层的图片 默认.ic_launcher
-                .setLargeIcon(BitmapFactory.decodeResource(getResources(),R.drawable.myback))  //用于指定通知的大图标
-                //.setContentIntent(pi)
-                .build();
-        startForeground(1,notification);
+        NotificationChannel notificationChannel= null;
+        //进行8.0的判断
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            notificationChannel= new NotificationChannel("CHANNEL_ONE_ID",
+                    "CHANNEL_ONE_ID", NotificationManager.IMPORTANCE_LOW);
+            notificationChannel.enableLights(true);
+            notificationChannel.setLightColor(Color.RED);
+            notificationChannel.setShowBadge(true);
+            notificationChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+            NotificationManager manager= (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            manager.createNotificationChannel(notificationChannel);
+
+            Intent intent=new Intent(this,Localmusic.class);
+            PendingIntent pi=PendingIntent.getActivity(this,0,intent,0);
+            Notification notification = new Notification.Builder(this).setChannelId("CHANNEL_ONE_ID")
+                    .setContentTitle("my音乐播放器")         //用于指定通知的标题内容
+                    .setContentText("music2")                 //用于指定通知的正文内容
+                    .setSmallIcon(R.drawable.myback)           //用于指定通知的小图标,注意只能用纯alpha图层的图片 默认.ic_launcher
+                    .setLargeIcon(BitmapFactory.decodeResource(getResources(),R.drawable.myback))  //用于指定通知的大图标
+                    .setContentIntent(pi) //用于设定点击事件
+                    .build();
+            notification.flags |= Notification.FLAG_NO_CLEAR;
+            startForeground(1, notification);
+        }
+        else{
+            Intent intent=new Intent(this,Localmusic.class);
+            PendingIntent pi=PendingIntent.getActivity(this,0,intent,0);
+            Notification notification=new NotificationCompat.Builder(this)
+                    //setTicker()设置的是通知时在状态栏显示的通知内容 如“您有一条短信，待查收”
+                    .setContentTitle("my音乐播放器")         //用于指定通知的标题内容(下拉后)
+                    .setContentText("music2")                 //用于指定通知的正文内容
+                    //.setWhen(System.currentTimeMillis())    //用于指定通知被创建的时间 单位毫秒
+                    .setSmallIcon(R.drawable.myback)           //用于指定通知的小图标,注意只能用纯alpha图层的图片 默认.ic_launcher
+                    .setLargeIcon(BitmapFactory.decodeResource(getResources(),R.drawable.myback))  //用于指定通知的大图标
+                    .setContentIntent(pi) //用于设定点击事件
+                    .build();
+            startForeground(1,notification);
+        }
 
         //新建耳机线控广播接收器的实例对象
         headsetButtonReceiver=new HeadsetButtonReceiver(this);
@@ -76,6 +115,7 @@ public class Music_Service extends Service implements HeadsetButtonReceiver.onHe
     @Override
     public void onDestroy() {
         Log.d(TAG, "onDestroy: ");
+        unregisterReceiver(locationReceiver);//卸载广播接收器
         headsetButtonReceiver.unregisterHeadsetReceiver();//注销耳机线控广播
         if(timer!=null) timer.cancel();
         if(player!=null){
@@ -102,6 +142,8 @@ public class Music_Service extends Service implements HeadsetButtonReceiver.onHe
     //播放音乐函数
     public void play(String path) {
         if(path==null) path="";
+        Localmusic.number=number;
+        Localmusic.tv1.setText(String.valueOf(number+1));//TODO刷新显示
         Localmusic.tv2.setText("路径:"+path);//显示路径
         final String thispath=path;
         try {
@@ -167,6 +209,22 @@ public class Music_Service extends Service implements HeadsetButtonReceiver.onHe
         });
     }
     //********************************************分割线：其他函数**************************************************
+
+    // TODO 创建内部类做为广播接收器接收服务发来的消息并立即处理 注：需要在onCreate里注册
+    public class LocationReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context,Intent intent){
+            String intentAction=intent.getAction();
+            if(intentAction.equals("location.action")) {
+                Bundle bundle=intent.getExtras();
+                String action=bundle.getString("action");
+                String p=bundle.getString("msg");
+                if(action.equals("play")) play(p);
+                else if(action.equals("next")) play_next();
+                Log.i(TAG, "onReceive: 广播"+action);
+            }
+        }
+    }
     //播放下一首函数
     public void play_next(){
         if(mode==0) {number++;if(number>=list.size()) number=0;}//顺序
