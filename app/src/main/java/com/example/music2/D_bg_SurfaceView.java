@@ -29,6 +29,7 @@ public class D_bg_SurfaceView extends SurfaceView implements SurfaceHolder.Callb
 
     public static boolean view_switch=false;//控制动画开关
     public static boolean stop=false;//控制物品创造的开关
+    public static boolean refresh=false;//重新绘制一次的信号
     //TODO 当前问题(性能优化)：该布尔变量只是阻止了新下坠物的诞生，计数等功能依然在继续，定时器耗电吗?  以及开关控制只能耳机线，需另加按钮
 
     private static final String TAG = "D_bg_SurfaceView";
@@ -217,20 +218,7 @@ public class D_bg_SurfaceView extends SurfaceView implements SurfaceHolder.Callb
     //用于刷新画布
     public void run() {
         while (flag) {
-            if(stop){//stop状态下每1秒刷新一次，用于切屏后刷新背景
-                long start = System.currentTimeMillis();
-                myDraw();
-                long end = System.currentTimeMillis();
-                long interval = end - start;
-                try {
-                    if (interval < 1000) {
-                        Thread.sleep(1000 - interval);
-                    }
-                } catch (InterruptedException ex) {
-                    ex.printStackTrace();
-                }
-            }
-            else if(!stop){
+            if(!stop){
                 long start = System.currentTimeMillis();
                 if(!view_switch&&item_List.size()==0) stop=true;
                 myDraw();
@@ -244,6 +232,26 @@ public class D_bg_SurfaceView extends SurfaceView implements SurfaceHolder.Callb
                     ex.printStackTrace();
                 }
             }
+            else if(refresh){
+                myDraw();
+                refresh=false;
+            }
+            /*
+            else if(stop){//stop状态下每1秒刷新一次，用于切屏后刷新背景
+                long start = System.currentTimeMillis();
+                myDraw();
+                long end = System.currentTimeMillis();
+                long interval = end - start;
+                try {
+                    if (interval < 500) {
+                        Thread.sleep(500 - interval);
+                    }
+                } catch (InterruptedException ex) {
+                    ex.printStackTrace();
+                }
+            }
+            */
+
         }
     }
 
@@ -259,6 +267,7 @@ public class D_bg_SurfaceView extends SurfaceView implements SurfaceHolder.Callb
         paint.setTextSize(80);paint.setStrokeWidth(5);
 
         flag = true;
+        refresh=true;//从后台切回来要重新绘图一次
         th = new Thread(this);
         th.start();
         Log.d(TAG,"自定义动画界面创建");
@@ -345,6 +354,7 @@ public class D_bg_SurfaceView extends SurfaceView implements SurfaceHolder.Callb
                 bg = BitmapFactory.decodeResource(getResources(), R.drawable.bg2);
                 break;
         }
+        refresh=true;//刷新一次界面
         Log.i(TAG,"转阶段 items="+items);
     }
 

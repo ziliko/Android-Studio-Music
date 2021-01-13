@@ -199,6 +199,7 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
     //Activity更新UI  信号通过定时器检测来刷新？
     public void play_UI_update(String path){
         Dbg.item_change();//切换背景布效果
+
         //列表滚动到指定位置
         //mylist.setSelection(number);//瞬间跳到指定位置  方法1:listview.setSelection(position);跳到指定位置并置顶
         mylist.smoothScrollToPosition(number);// 方法2:listview.smoothScrollToPosition(position);自动滚动,当指定位置出现即停止 加入第二个参数指定距top的距离?  距离过大时会中途停止?   TODO 若要改变速度，需要查看源码并重新自定义一个方法
@@ -365,7 +366,8 @@ public class Localmusic extends AppCompatActivity implements View.OnClickListene
                     mydb.execSQL(sql12);mydb.execSQL(sql13);mydb.execSQL(sql14);mydb.execSQL(sql15);mydb.execSQL(sql16);
                 }
                 //改成关闭所有活动的退出
-                finish();
+                //finish();
+                System.exit(0);
                 break;
 
             default:break;

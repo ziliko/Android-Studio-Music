@@ -35,9 +35,11 @@
 
         <activity
             android:name=".Internetmusic"
+            android:launchMode="singleTask"
             android:screenOrientation="portrait" />
         <activity
             android:name=".Localmusic"
+            android:launchMode="singleTask"
             android:screenOrientation="portrait" />
         <activity android:name=".MainActivity">
             <intent-filter>

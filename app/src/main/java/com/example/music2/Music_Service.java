@@ -36,6 +36,8 @@ public class Music_Service extends Service implements HeadsetButtonReceiver.onHe
     HeadsetButtonReceiver headsetButtonReceiver;
     static List<Song> list;//持有一个播放列表，copy Activity里的，保证内循环
     static MediaPlayer player=new MediaPlayer();
+    MediaPlayer noSoundPlayer=new MediaPlayer();//TODO 无声音乐保活
+
     static int number;
     static int mode;//0 1 2
     static int list_kind;//0 1 2
@@ -49,6 +51,7 @@ public class Music_Service extends Service implements HeadsetButtonReceiver.onHe
     //仅当第一次创建该Service时被调用
     @Override
     public void onCreate() {
+        super.onCreate();
         Log.d(TAG, "onCreate: ");
 
         /*注册本地广播接收器*/
@@ -102,7 +105,10 @@ public class Music_Service extends Service implements HeadsetButtonReceiver.onHe
         headsetButtonReceiver.setOnHeadsetListener(this);
         this.initplayerListener();
 
-        super.onCreate();
+        //启动无声音乐循环播放
+        noSoundPlayer =MediaPlayer.create(this, R.raw.nosound);// *1为当前上下文，*2为音频资源编号
+        noSoundPlayer.setLooping(true);    //设置循环播放
+        noSoundPlayer.start();
     }
     //每次启动Service都会调用
     @Override
@@ -122,6 +128,7 @@ public class Music_Service extends Service implements HeadsetButtonReceiver.onHe
             player.stop();
             player.release();
         }
+        noSoundPlayer.stop();
         super.onDestroy();
     }
 
